@@ -34,6 +34,7 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f db/install.sql
           psql -X -v ON_ERROR_STOP=1 -f db/reports.sql
           psql -X -v ON_ERROR_STOP=1 -f tests/integrity.sql
+          python3 tests/reports.py
       - name: Check that a repeat install preserves data
         run: |
           psql -X -v ON_ERROR_STOP=1 -c "INSERT INTO hmc.admin VALUES (999, 'CI marker', 'ci@example.invalid')"
@@ -42,17 +43,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Resolve dashboard dependencies
+      - name: Install dashboard dependencies
         working-directory: app
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Exercise the dashboard and reporting endpoints against PostgreSQL
         working-directory: app
         run: npm test
-      - name: Record the initial public dependency lock
-        working-directory: app
-        run: node -e 'console.log("HMC_NPM_LOCK " + JSON.stringify(require("./package-lock.json")))'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dashboard-lock
-          path: app/package-lock.json
-          retention-days: 1
