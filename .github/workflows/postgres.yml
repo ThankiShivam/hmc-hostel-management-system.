@@ -39,3 +39,20 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -c "INSERT INTO hmc.admin VALUES (999, 'CI marker', 'ci@example.invalid')"
           if psql -X -v ON_ERROR_STOP=1 -f db/install.sql; then exit 1; fi
           test "$(psql -XAtc 'SELECT count(*) FROM hmc.admin WHERE admin_id = 999')" = 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Resolve dashboard dependencies
+        working-directory: app
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Exercise the dashboard and reporting endpoints against PostgreSQL
+        working-directory: app
+        run: npm test
+      - name: Record the initial public dependency lock
+        working-directory: app
+        run: node -e 'console.log("HMC_NPM_LOCK " + JSON.stringify(require("./package-lock.json")))'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-lock
+          path: app/package-lock.json
+          retention-days: 1
