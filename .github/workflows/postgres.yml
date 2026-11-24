@@ -1,0 +1,41 @@
+name: PostgreSQL checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: hmc
+          POSTGRES_PASSWORD: demo-ci-only
+          POSTGRES_DB: hostel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hmc -d hostel"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGDATABASE: hostel
+      PGUSER: hmc
+      PGPASSWORD: demo-ci-only
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the fixture and run every report
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f db/install.sql
+          psql -X -v ON_ERROR_STOP=1 -f db/reports.sql
+          psql -X -v ON_ERROR_STOP=1 -f tests/integrity.sql
+      - name: Check that a repeat install preserves data
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -c "INSERT INTO hmc.admin VALUES (999, 'CI marker', 'ci@example.invalid')"
+          if psql -X -v ON_ERROR_STOP=1 -f db/install.sql; then exit 1; fi
+          test "$(psql -XAtc 'SELECT count(*) FROM hmc.admin WHERE admin_id = 999')" = 1
